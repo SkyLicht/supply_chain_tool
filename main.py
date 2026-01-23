@@ -1,11 +1,29 @@
 import json
 from collections import defaultdict
+from gettext import find
+from idlelib.search import find_again
 from typing import List, Optional, Dict, Counter
 
 import pandas as pd
-from numpy.ma.core import count
 from pydantic import BaseModel
 
+
+
+class PartNumber(BaseModel):
+    hh_pn: str
+    customer_pn: str
+    supplier_pn: str
+    description: str
+    supplier_name: str
+
+
+class VPN(BaseModel):
+    vpn: str  # vpn name
+    item: float
+    usage: int
+    area: str
+    locations: List[str]
+    pn_list: List[PartNumber]
 
 class BOM(BaseModel):
     HH_PCA_PN: str
@@ -20,22 +38,17 @@ class BOM(BaseModel):
     PLATFORM_NAME: str
     VPN_LIST: List[VPN]
 
-
-class VPN(BaseModel):
-    vpn: str  # vpn name
-    item: float
-    usage: int
-    area: str
-    locations: List[str]
-    pn_list: List[PartNumber]
-
-
-class PartNumber(BaseModel):
-    hh_pn: str
-    customer_pn: str
-    supplier_pn: str
+class Material(BaseModel):
+    material: str
+    vpn: str
     description: str
-    supplier_name: str
+    request_qty: float
+    withdrawn_qty: float
+    relevance: str
+    usage: float
+    area: str
+    delivery_qty: float = 0
+
 
 
 def format_bom(path: str):
@@ -199,16 +212,7 @@ class Materials(BaseModel):
         df.to_excel("summary.xlsx", index=False)
 
 
-class Material(BaseModel):
-    material: str
-    vpn: str
-    description: str
-    request_qty: float
-    withdrawn_qty: float
-    relevance: str
-    usage: float
-    area: str
-    delivery_qty: float = 0
+
 
 
 def format_requirement(path: str, bom_areas_path: str,deliver_path: str, total_units: int = 0):
@@ -278,8 +282,30 @@ def summary_delivery(path: str):
     #     print(pn, sum(qtys))
 
 
+def find_pn_in_deliver(path:str, pn: List[str]):
+    with open(path, "r") as f:
+        deliver = json.load(f)
+
+    _temp = []
+    for item in deliver:
+        if item["HH_PN"] in pn:
+            _temp.append(item)
+
+    _df = pd.DataFrame(_temp)
+    _df["CREATED_DATE"] = pd.to_datetime(_df["CREATED_DATE"])
+
+    _df.sort_values("CREATED_DATE", inplace=True)
+
+    _df.reset_index(inplace=True, drop=True)
+    _df.to_excel("pn_in.xlsx", index=False)
+    # to excel
+
+
+
+
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     # format_bom(r"C:\Users\skyli\Downloads\M15KP_BOOM.xlsx")
-    summary_delivery(r"C:\Users\skyli\Downloads\wo_000390018996.json")
+    # summary_delivery(r"C:\Users\jorgeortiza\OneDrive - Foxconn\IE\Materials\Consumption\wo_000390018996.json")
     # format_requirement(r"C:\Users\skyli\Downloads\EXPORT_20260117204312.xlsx", 'bom.json',"summary_consumption.json", 6000)
+    find_pn_in_deliver(r"C:\Users\jorgeortiza\OneDrive - Foxconn\IE\Materials\Consumption\wo_000390018996.json", ['62010JC00-011-H'])
