@@ -10,7 +10,7 @@ class Material(BaseModel):
     track: str
     feeder_type: str
     description: str
-    quantity: int
+    quantity: float
     location: str
     alternates_hh_pn: List[str] = []
 
@@ -77,6 +77,7 @@ def read_data(path: str):
 
 
 def upload_ll_to_pb(
+        url:str,
         ref: str,
         line: str,
         sku: str,
@@ -92,7 +93,7 @@ def upload_ll_to_pb(
     #     "smt": "JSON",
     #     "pth": "JSON"
     # };
-    result = requests.post("http://192.168.0.85:8090/api/collections/LOADING_LIST/records",
+    result = requests.post(f'{url}/api/collections/LOADING_LIST/records',
                            json=dict(ref=ref, line=line, sku=sku, rev=rev, smt=smt, pth=pth))
 
     if result.status_code == 200:
@@ -109,7 +110,7 @@ def upload_ll_to_pb(
         }
 
 
-def create_material_in_pb(id: str, category: str, ref: str, machine: str, side: str, record: Material):
+def create_material_in_pb(db_ip: str,id: str, category: str, ref: str, machine: str, side: str, record: Material):
     # http://192.168.0.85:8090
     # api/collections/LOADING_LIST_PN/records
     # data = {
@@ -137,15 +138,15 @@ def create_material_in_pb(id: str, category: str, ref: str, machine: str, side: 
         "feeder_type": record.feeder_type,
         "category": category
     }
-    result = requests.post("http://192.168.0.85:8090/api/collections/LOADING_LIST_PN/records", json=data)
+    result = requests.post(f"{db_ip}/api/collections/LOADING_LIST_PN/records", json=data)
 
 
-def run_ll_upload(path: str, ref: str , category: str = "SMT", ):
+def run_ll_upload(db_ip: str,path: str, ref: str , category: str = "SMT", ):
     # print(json.dumps(read_data(path), indent=4))
 
     param = ref.split("_")
     data = decompile_json(read_data(path))
-    status = upload_ll_to_pb(ref=ref, line=param[0], sku=param[1], rev=param[2],
+    status = upload_ll_to_pb(url=db_ip,ref=ref, line=param[0], sku=param[1], rev=param[2],
                              smt=json.dumps(data.to_dict()["sheets"]), pth="[]")
 
     if status["status"] == 200:
@@ -155,6 +156,7 @@ def run_ll_upload(path: str, ref: str , category: str = "SMT", ):
                 pass
 
                 create_material_in_pb(
+                    db_ip,
                     id=status["id"],
                     category=category,
                     ref=ref,
