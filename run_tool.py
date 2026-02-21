@@ -7,7 +7,9 @@ if __name__ == '__main__':
     # loading_list_init()
     # run_server()
     # print(df)
-    # run_extraction(r"C:\Users\jorgeortiza\OneDrive - Foxconn\IE\Materials\Loading List\J01_XF2C1_A01.xlsx","J01_XF2C1_A01")
+    # run_extraction(r"C:\Users\jorgeortiza\OneDrive - Foxconn\IE\Materials\Loading List\J02_1P8W3_A03.xlsx","J02_1P8W3_A03")
 
     run_ll_upload("http://10.13.32.220:8090",
-                  r"C:\data\ie_tool_2_source\data\scm\loading_list\J01_XF2C1_A01.json", ref="J01_XF2C1_A01")
+                  r"C:\data\ie_tool_2_source\data\scm\loading_list\J09_4XJN9_A02.json", ref="J09_4XJN9_A02")
+
+    pass

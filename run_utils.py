@@ -8,8 +8,9 @@ from pydantic import BaseModel
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from util.wo_details import DeliverMaterialList, MaterialGroup, get_wo_details
+
 CONSUMPTION_URL = 'https://emdii-webtool.foxconn-na.com/api/getWO_PKGID?workorder='
-SAP_REQUIREMENT = 'https://emdii-webtool.foxconn-na.com/api/get_wo_detail?workorder='
 
 
 def parse_created_date(value: str) -> Optional[str]:
@@ -91,45 +92,6 @@ def summary_delivery(delivery_records: List[Dict[str, str]]) -> dict:
     return _return_summary
 
 
-class Material(BaseModel):
-    high_level_pn: str
-    part_number: str
-    is_primary: bool
-    request_qty: int
-    description: str
-    item: str
-    updated_by: str
-    last_modified: str
-
-
-class DeliverMaterialList(BaseModel):
-    pn: str
-    reals: int
-    qty: int
-    std_pkg: int
-    items: List[str]
-
-
-class MaterialGroup(BaseModel):
-    high_level_pn: str
-    primary_pn: str
-    request_qty: int
-    consumption_qty: int
-    attrition: int
-    total_consumption: int
-    total_deliver: int = 0
-    overstock: int = 0
-    over_deliver_rate: float = 0
-    total_deliver_reals: int = 0
-    std_pack: int = 0
-    severity: float = 0
-    sku: str
-    wo: str
-    materials: List[Material]
-    deliver_materials: List[DeliverMaterialList] = []
-    list_materials_str: List[str] = []
-
-
 class MaterialGroupAndDeliversHandler(BaseModel):
     total_consumption: int = 0
     groups: List[MaterialGroup]
@@ -150,7 +112,8 @@ class MaterialGroupAndDeliversHandler(BaseModel):
                     )
             if len(group.deliver_materials) > 0:
                 group.std_pack = max([item.std_pkg for item in group.deliver_materials])
-            else: group.std_pack = 0
+            else:
+                group.std_pack = 0
 
     def overstock_calculation(self):
         for group in self.groups:
@@ -220,113 +183,6 @@ def overdeliver_to_excel(material_groups: List[MaterialGroup], headers: tuple[st
     # df = pd.DataFrame(material_groups)
     # df.to_excel("summary.xlsx", index=False)
 
-def format_requirement(wo: str):
-    _responds = call_api(SAP_REQUIREMENT + wo)
-    # Responds Data Structure
-    # "COL_14": null,
-    # "COL_15": "32024Q700-A0-5J42H",  high level part number
-    # "COL_16": 0,
-    # "COL_17": "1000", -> SLoc
-    # "COL_18": null, -> primary part number
-    # "COL_19": null,
-    # "COL_20": null,
-    # "COL_21": null,
-    # "COL_22": null,
-    # "COL_23": "47505", -> Updated by
-    # "COL_24": "Fri, 08 Oct 2021 17:20:09 GMT", - last modified date
-    # "CONTAINER_NO": null, -> if is phantom part number == x, phantom is high level part number id
-    # "EMP_NO": "1",
-    # "ERROR_FLAG": null,
-    # "GROUP_NAME": 0, ->
-    # "IN_STATION_TIME": "ST",
-    # "LINE_NAME": "320253E00-279-H", -> part number
-    # "MODEL_NAME": "0030", -> item
-    # "NEXT_STATION": null,
-    # "OUT_STATION_TIME": "MG3200",
-    # "PALLET_NO": "IC,USB Power-Distribution Switches,APL35", -> material description
-    # "SECTION_NAME": 0, -> requirement qty
-    # "STATION_NAME": null,
-    # "VERSION_CODE": "MX01", -> factory
-    # "WORK_ORDER": "000390001893", -> wo
-    if not _responds:
-        print("No responds")
-        return None
-
-    _high_level_pn = []
-    _materials = []
-    _group_request_qty = []
-
-    for item in _responds:
-        if item["CONTAINER_NO"] == 'X':
-            _high_level_pn.append({
-                "high_level_pn": item["LINE_NAME"],
-                "request_qty": int(item["SECTION_NAME"]),
-                "consumption_qty": 0,
-                "sku": item["COL_15"],
-                "wo": item["WORK_ORDER"]
-            })
-            _group_request_qty.append(item["SECTION_NAME"])
-        else:
-            _materials.append({
-                "high_level_pn": item["COL_15"],
-                "part_number": item["LINE_NAME"],
-                # "primary_pn": 'nan' if item["COL_18"] is None else item["COL_18"],
-                "is_primary": True if item["MODEL_NAME"] == "0010" else False,
-                "request_qty": int(item["SECTION_NAME"]),
-                "description": item["PALLET_NO"],
-                "item": item["MODEL_NAME"],
-                "updated_by": item["COL_23"],
-                "last_modified": item["COL_24"]
-            })
-
-    # Determine the PCB quantity by identifying the most frequently occurring value in _group_request_qty
-    _total_pcb = Counter(_group_request_qty).most_common(1)[0][0]
-
-    # Calculate the consumption quantity of each high-level part number
-    for item in _high_level_pn:
-        item["consumption_qty"] = item["request_qty"] / _total_pcb
-
-    # Print the result
-    # for item in _materials:
-    #     print(json.dumps(item, indent=4))
-
-    _high_level_pn_groups: List[MaterialGroup] = []
-    for item in _high_level_pn:
-        _high_level_pn_groups.append(
-            MaterialGroup(
-                high_level_pn=item['high_level_pn'],
-                primary_pn="nan",
-                request_qty=item['request_qty'],
-                attrition=0,
-                total_consumption=0,
-                consumption_qty=int(item['consumption_qty']),
-                sku=item['sku'],
-                wo=item['wo'],
-                materials=[]
-            )
-        )
-
-    for item in _materials:
-        for group in _high_level_pn_groups:
-            if group.high_level_pn == item['high_level_pn']:
-                group.materials.append(Material(**item))
-                group.total_consumption += item['request_qty']
-
-    # find primary pn
-    for group in _high_level_pn_groups:
-        group.attrition = group.total_consumption - group.request_qty
-        for material in group.materials:
-            group.list_materials_str.append(material.part_number)
-            if material.is_primary:
-                group.primary_pn = material.part_number
-
-    #
-    # for item in _high_level_pn_groups:
-    #     print(json.dumps(item.model_dump(), indent=4))
-
-    return _high_level_pn_groups
-
-
 __total = []
 __report = []
 
@@ -352,7 +208,7 @@ if __name__ == '__main__':
 
         _summary_deliver = summary_delivery(_responds)
 
-        _material_group_handle = format_requirement(_wo)
+        _material_group_handle = get_wo_details(_wo)
         if not _material_group_handle:
             print(f"no sap {_wo}")
             continue

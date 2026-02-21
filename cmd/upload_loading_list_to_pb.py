@@ -1,6 +1,6 @@
 import json
 from typing import List
-
+from pathlib import Path
 import requests
 from pydantic import BaseModel
 
@@ -36,6 +36,25 @@ class LoadingList(BaseModel):
         return self.model_dump()
 
 
+def as_number_or_zero(v):
+    """Coerce possibly-None/empty/str numbers to float, defaulting to 0.0."""
+    if v is None:
+        return 0.0
+    if isinstance(v, str):
+        s = v.strip()
+        if s == "" or s.lower() in {"none", "nan", "null"}:
+            return 0.0
+        # Optional: normalize comma decimals like "12,5" -> "12.5"
+        s = s.replace(",", ".")
+        try:
+            return float(s)
+        except ValueError:
+            return 0.0
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
 def decompile_json(data: dict) -> LoadingList:
     sheets: List[Sheet] = []
     for records in data:
@@ -58,10 +77,10 @@ def decompile_json(data: dict) -> LoadingList:
                         track=m["track"],
                         location=m["location"],
                         description=m["parts_type"],
-                        quantity=m["quantity"],
+                        quantity=m.get("quantity"),  # <-- key part
                         feeder_type=m["feeder_type"],
                         alternates_hh_pn=m["alternates_hh_pn"]
-                    ) for m in material_list
+                    ) for m in material_list if as_number_or_zero(m.get("quantity")) != 0
                 ]
             )
         )
@@ -71,9 +90,21 @@ def decompile_json(data: dict) -> LoadingList:
 
 
 # Read json file
-def read_data(path: str):
-    with open(path) as f:
-        return json.load(f)
+# def read_data(path: str):
+#     with open(path) as f:
+#         return json.load(f)
+
+
+
+def read_data(path: str | Path):
+    path = Path(path)
+    # Try UTF-8 first (most common for JSON). Fallback to UTF-8 with BOM.
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except UnicodeDecodeError:
+        with path.open("r", encoding="utf-8-sig") as f:
+            return json.load(f)
 
 
 def upload_ll_to_pb(
@@ -110,7 +141,7 @@ def upload_ll_to_pb(
         }
 
 
-def create_material_in_pb(db_ip: str,id: str, category: str, ref: str, machine: str, side: str, record: Material):
+def create_material_in_pb(db_ip: str,sheet:str,id: str, category: str, ref: str, machine: str, side: str, record: Material):
     # http://192.168.0.85:8090
     # api/collections/LOADING_LIST_PN/records
     # data = {
@@ -127,6 +158,7 @@ def create_material_in_pb(db_ip: str,id: str, category: str, ref: str, machine: 
     # };
 
     data = {
+        "sheet":sheet,
         "ref": ref,
         "machine": machine,
         "side": side,
@@ -157,6 +189,7 @@ def run_ll_upload(db_ip: str,path: str, ref: str , category: str = "SMT", ):
 
                 create_material_in_pb(
                     db_ip,
+                    sheet.header.sheet,
                     id=status["id"],
                     category=category,
                     ref=ref,
