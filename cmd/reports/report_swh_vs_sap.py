@@ -3,13 +3,13 @@ import pandas as pd
 
 def report_swh_vs_sap():
     sap_inventory = pd.read_excel(
-        r"C:\data\ie_tool_v2\db\planing_db\ref_data\EXPORT_20260220222940.xlsx"
+        r"C:\data\ie_tool_2_source\db\planing_db\ref_data\sLOC_1001.xlsx"
     )
 
     sap_inventory = sap_inventory[["Material", "Unrestricted"]]
 
     swh_inventory = pd.read_json(
-        r"C:\data\ie_tool_v2\db\planing_db\ref_data\swh_data.json"
+        r"C:\data\ie_tool_2_source\db\planing_db\ref_data\swh_data.json"
     )
     swh_inventory = swh_inventory[swh_inventory["AREA_CODE"].isin(["W01", "W02"])]
 
@@ -36,8 +36,8 @@ def report_swh_vs_sap():
             "discrepancy": "diff",
         }
     )
-
+    #C:\data\ie_tool_2_source\db\planing_db\ref_data
     sap_discrepancies.to_json(
-        r"C:\data\ie_tool_v2\db\planing_db\ref_data\sap_discrepancies.json",
+        r"C:\data\ie_tool_2_source\db\planing_db\ref_data\sap_discrepancies.json",
         orient="records",
     )
