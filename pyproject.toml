@@ -10,4 +10,5 @@ dependencies = [
     "pandas-stubs~=2.3.3",
     "pydantic>=2.12.5",
     "requests>=2.32.5",
+    "ruff>=0.15.2",
 ]

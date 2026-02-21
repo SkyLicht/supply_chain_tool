@@ -4,4 +4,8 @@
     <option name="sdkName" value="uv (supply_chain_tool)" />
   </component>
   <component name="ProjectRootManager" version="2" project-jdk-name="uv (supply_chain_tool)" project-jdk-type="Python SDK" />
+  <component name="RuffConfiguration">
+    <option name="enabled" value="true" />
+    <option name="sdkName" value="uv (supply_chain_tool)" />
+  </component>
 </project>
