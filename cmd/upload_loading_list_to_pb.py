@@ -77,7 +77,7 @@ def decompile_json(data: dict) -> LoadingList:
                         track=m["track"],
                         location=m["location"],
                         description=m["parts_type"],
-                        quantity=m.get("quantity"),  # <-- key part
+                        quantity=len(m.get("location","").split(",")),  # <-- key part
                         feeder_type=m["feeder_type"],
                         alternates_hh_pn=m["alternates_hh_pn"]
                     ) for m in material_list if as_number_or_zero(m.get("quantity")) != 0
