@@ -1,7 +1,7 @@
 import asyncio
 import json
 from collections import Counter
-
+import pandas as pd
 import requests
 
 DFMS_GET_WO_PN_URL = 'https://emdii-webtool.foxconn-na.com/api/getWO_PKGID?'
@@ -20,7 +20,7 @@ POCKET_BASE_GET_WO_URL = "http://10.13.32.220:8090/api/collections/WO_STATUS/rec
 
 async def get_wo_pn_deliver_to_production(wo: str):
     res = await asyncio.to_thread(requests.get, f"{DFMS_GET_WO_PN_URL}workorder={wo}")
-    await asyncio.sleep(0.02)
+    await asyncio.sleep(0.01)
 
     if res.status_code == 200:
         print("success ->",wo)
@@ -51,35 +51,42 @@ async def update_std_pkg():
 
     for wo in wos:
         data = await get_wo_pn_deliver_to_production(wo)
+
         for item in data:
+
+
             complete_data.append({
                 'part_number': item['HH_PN'],
                 'qty': item['QTY'],
                 'pkg_id': item['PKG_ID'],
+                'emp': item['EMP_NUMBER'],
+                'line': item['LINE_NAME'],
+                'date': item['CREATED_DATE'],
+                'wo': item['WO'],
+                'remark': item['REMARKS'],
             })
+
+    # save in json file
+    pd.DataFrame(complete_data).to_excel('pn_deliver_to_production.xlsx', index=False)
 
     unique_pn = set(item['part_number'] for item in complete_data)
 
     pn_dict = {pn: [] for pn in unique_pn}
 
-    # save in json file
-    # with open('pn_std_pkg.json', 'w') as f:
-    #     json.dump(pn_dict, complete_data)
-
-    for item in complete_data:
-        if item['pkg_id'][:2] in ['XR', 'HL']:
-            continue
-        pn_dict[item['part_number']].append(item['qty'])
-
-    for pn, qtys in pn_dict.items():
-        _mc = most_common_number(qtys)
-        if not _mc:
-            continue
-        await asyncio.to_thread(
-            requests.post,
-            POCKET_BASE_URL,
-            json={"part_number": pn, "std_pkg": _mc},
-        )
+    # for item in complete_data:
+    #     if item['pkg_id'][:2] in ['XR', 'HL']:
+    #         continue
+    #     pn_dict[item['part_number']].append(item['qty'])
+    #
+    # for pn, qtys in pn_dict.items():
+    #     _mc = most_common_number(qtys)
+    #     if not _mc:
+    #         continue
+    #     await asyncio.to_thread(
+    #         requests.post,
+    #         POCKET_BASE_URL,
+    #         json={"part_number": pn, "std_pkg": _mc},
+    #     )
 
 
     print('susccess')
