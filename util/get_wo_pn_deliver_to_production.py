@@ -69,24 +69,25 @@ async def update_std_pkg():
     # save in json file
     pd.DataFrame(complete_data).to_excel('pn_deliver_to_production.xlsx', index=False)
 
+
     unique_pn = set(item['part_number'] for item in complete_data)
 
     pn_dict = {pn: [] for pn in unique_pn}
 
-    # for item in complete_data:
-    #     if item['pkg_id'][:2] in ['XR', 'HL']:
-    #         continue
-    #     pn_dict[item['part_number']].append(item['qty'])
-    #
-    # for pn, qtys in pn_dict.items():
-    #     _mc = most_common_number(qtys)
-    #     if not _mc:
-    #         continue
-    #     await asyncio.to_thread(
-    #         requests.post,
-    #         POCKET_BASE_URL,
-    #         json={"part_number": pn, "std_pkg": _mc},
-    #     )
+    for item in complete_data:
+        if item['pkg_id'][:2] in ['XR', 'HL']:
+            continue
+        pn_dict[item['part_number']].append(item['qty'])
+
+    for pn, qtys in pn_dict.items():
+        _mc = most_common_number(qtys)
+        if not _mc:
+            continue
+        await asyncio.to_thread(
+            requests.post,
+            POCKET_BASE_URL,
+            json={"part_number": pn, "std_pkg": _mc},
+        )
 
 
     print('susccess')
